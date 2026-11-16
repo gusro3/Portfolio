@@ -120,6 +120,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Camera\camera.cpp" />
+    <ClCompile Include="Console.cpp" />
+    <ClCompile Include="Elements.cpp" />
     <ClCompile Include="Graphics\window.cpp" />
     <ClCompile Include="include\imgui.cpp" />
     <ClCompile Include="include\imgui_demo.cpp" />
@@ -133,9 +135,12 @@
     <ClCompile Include="Model Loading\mesh.cpp" />
     <ClCompile Include="Shaders\shader.cpp" />
     <ClCompile Include="Model Loading\texture.cpp" />
+    <ClCompile Include="View.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera\camera.h" />
+    <ClInclude Include="Console.h" />
+    <ClInclude Include="Elements.h" />
     <ClInclude Include="freeglut-3.6.0\include\GL\freeglut.h" />
     <ClInclude Include="freeglut-3.6.0\include\GL\freeglut_ext.h" />
     <ClInclude Include="freeglut-3.6.0\include\GL\freeglut_std.h" />
@@ -148,21 +153,13 @@
     <ClInclude Include="include\GLFW\glfw3native.h" />
     <ClInclude Include="include\glut.h" />
     <ClInclude Include="include\glutil.h" />
-    <ClInclude Include="include\imconfig.h" />
-    <ClInclude Include="include\imgui.h" />
-    <ClInclude Include="include\imgui_impl_glfw.h" />
-    <ClInclude Include="include\imgui_impl_opengl3.h" />
-    <ClInclude Include="include\imgui_impl_opengl3_loader.h" />
-    <ClInclude Include="include\imgui_internal.h" />
-    <ClInclude Include="include\imstb_rectpack.h" />
-    <ClInclude Include="include\imstb_textedit.h" />
-    <ClInclude Include="include\imstb_truetype.h" />
     <ClInclude Include="include\unistd.h" />
     <ClInclude Include="Model Loading\meshLoaderObj.h" />
     <ClInclude Include="Model Loading\mesh.h" />
     <ClInclude Include="Model Loading\stringTokenizer.h" />
     <ClInclude Include="Shaders\shader.h" />
     <ClInclude Include="Model Loading\texture.h" />
+    <ClInclude Include="View.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="glut32.dll" />

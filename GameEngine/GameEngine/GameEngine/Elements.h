@@ -1,0 +1,6 @@
+
+namespace Elements {
+
+	void RenderUI();
+}
+

@@ -5,8 +5,13 @@
 #include "Model Loading\texture.h"
 #include "Model Loading\meshLoaderObj.h"
 #include "imgui.h"
+#include "Console.h"
+#include "View.h"
+#include "Elements.h"
+
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "imgui_internal.h"
 
 #include <fstream>
 #include <iostream>
@@ -30,6 +35,9 @@ bool spirit_loose = false;
 bool oasis = false;
 
 int phase = 0;
+
+int width = 800;
+int height = 800;
 
 char* phase0 = "The crash still rings in your head. \"How long was I out for?\" You contemplate no furder, the thirst shuts you up and you beging looking for an oasis";
 char* phase1 = "You found the oasis but you are not safe yet. You have to find the srap of your plane to fix it and scape. You remember a few important details a catus a well and nothingness. ";
@@ -126,7 +134,7 @@ std::vector<glm::vec3> scrap_positions = {
 
 int collected_scraps = 0;
 
-// SANDSTORM POSITIONS AND VELOCITY
+// SANDSTORM POSITIONS AND SPEED
 
 std::vector<glm::vec3> sandstorm_positions = {
 	glm::vec3(50.0f, -50.0f, 50.0f),
@@ -254,16 +262,65 @@ int main()
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	ImGui::StyleColorsDark();
 	ImGui_ImplGlfw_InitForOpenGL(window.getWindow(), true);
 	ImGui_ImplOpenGL3_Init("#version 400");
 
+	/*
+	unsigned int rectVAO, rectVBO;
+	glGenVertexArrays(1, &rectVAO);
+	glGenBuffers(1, &rectVBO);
+	glBindVertexArray(rectVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, rectVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(rectangleVertices), &rectangleVertices, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));*/
 
+
+
+
+	// Create Frame Buffer Object
+	unsigned int FBO;
+	glGenFramebuffers(1, &FBO);
+	glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+
+	// Create Framebuffer Texture
+	unsigned int framebufferTexture;
+	glGenTextures(1, &framebufferTexture);
+	glBindTexture(GL_TEXTURE_2D, framebufferTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // Prevents edge bleeding
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Prevents edge bleeding
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, framebufferTexture, 0);
+
+
+	
+
+	// Create Render Buffer Object
+	unsigned int RBO;
+	glGenRenderbuffers(1, &RBO);
+	glBindRenderbuffer(GL_RENDERBUFFER, RBO);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, RBO);
+
+
+	// Error checking framebuffer
+	auto fboStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	if (fboStatus != GL_FRAMEBUFFER_COMPLETE)
+		std::cout << "Framebuffer error: " << fboStatus << std::endl;
+
+	
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	// MAIN LOOP
 	bool showHistory = false;
 	bool setting = true;
-	PlaySound("Cocteau-Twins-Heaven-Or-Las-Vegas-_Official-Video_.wav", NULL, SND_FILENAME | SND_ASYNC);
+	/*PlaySound("Cocteau-Twins-Heaven-Or-Las-Vegas-_Official-Video_.wav", NULL, SND_FILENAME | SND_ASYNC);*/
 	while (!window.isPressed(GLFW_KEY_ESCAPE) &&
 		glfwWindowShouldClose(window.getWindow()) == 0)
 	{
@@ -289,42 +346,45 @@ int main()
 
 		ImGui::Begin("Game info:");
 
+		Console::RenderUI();
+		Elements::RenderUI();
+		View::RenderUI(framebufferTexture);
+		
+		//if (ImGui::Button("Show history")) {
+		//	showHistory = !showHistory;
+		//}
 
-		if (ImGui::Button("Show history")) {
-			showHistory = !showHistory;
-		}
+
+	//	float currentFrame = glfwGetTime();
 
 
-		float currentFrame = glfwGetTime();
+	//	deltaTime = currentFrame - lastFrame;
+	//	lastFrame = currentFrame;
 
-
-		deltaTime = currentFrame - lastFrame;
-		lastFrame = currentFrame;
-
-		// COUNTER
-		// Update timer
-		timer -= deltaTime;
-		timeSinceLastPrint += deltaTime;
-		if (glm::length(camera.getCameraPosition() - glm::vec3(-200.0f, -15.0f, 50.0f)) < 100.0f && !oasis) {
-			oasis = true;
-			std::cout << phase1 << std::endl;
-			timer = 200;
-			phase++;
-		}
-	if(!oasis){
-		if (timer <= 0.0f) {
-			std::cout << "You have weakened. You have lost the game!" << std::endl;
-			glfwSetWindowShouldClose(window.getWindow(), GL_TRUE);
-		}
-		else if (timeSinceLastPrint >= 5.0f) {
-			std::cout << "Time remaining: " << (int)timer << " seconds. You are very weak! Try to find the oasis to survive." << std::endl;
-			timeSinceLastPrint = 0.0f;
-		}
-	}
-	if (timer <= 0.0f) {
-		std::cout << "You are dead! GAME OVER" << std::endl;
-		glfwSetWindowShouldClose(window.getWindow(), GL_TRUE);
-	}
+	//	// COUNTER
+	//	// Update timer
+	//	timer -= deltaTime;
+	//	timeSinceLastPrint += deltaTime;
+	//	if (glm::length(camera.getCameraPosition() - glm::vec3(-200.0f, -15.0f, 50.0f)) < 100.0f && !oasis) {
+	//		oasis = true;
+	//		std::cout << phase1 << std::endl;
+	//		timer = 200;
+	//		phase++;
+	//	}
+	//if(!oasis){
+	//	if (timer <= 0.0f) {
+	//		std::cout << "You have weakened. You have lost the game!" << std::endl;
+	//		glfwSetWindowShouldClose(window.getWindow(), GL_TRUE);
+	//	}
+	//	else if (timeSinceLastPrint >= 5.0f) {
+	//		std::cout << "Time remaining: " << (int)timer << " seconds. You are very weak! Try to find the oasis to survive." << std::endl;
+	//		timeSinceLastPrint = 0.0f;
+	//	}
+	//}
+	//if (timer <= 0.0f) {
+	//	std::cout << "You are dead! GAME OVER" << std::endl;
+	//	glfwSetWindowShouldClose(window.getWindow(), GL_TRUE);
+	//}
 		processKeyboardInput();
 		
 
@@ -354,9 +414,13 @@ int main()
 		}*/
 		 //// Code for the light ////
 
-
+		glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+		glViewport(0, 0, width, height);
+		glClearColor(0.8f, 0.8f, 0.5f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		skyboxShader.use();
+
 
 		glm::mat4 ProjectionMatrix = glm::perspective(90.0f, window.getWidth() * 1.0f / window.getHeight(), 0.1f, 10000.0f);
 		glm::mat4 ViewMatrix = glm::lookAt(camera.getCameraPosition(), camera.getCameraPosition() + camera.getCameraViewDirection(), camera.getCameraUp());
@@ -431,211 +495,213 @@ int main()
 
 
 
-		int i = 0;
-		for (auto& pos : sandstorm_positions) {
-			// Calcular el vector de dirección hacia la cámara
-			glm::vec3 direction = pos - camera.getCameraPosition();
-			glm::vec3 direction_normalizada = glm::normalize(direction);
+		//int i = 0;
+		//for (auto& pos : sandstorm_positions) {
+		//	// Calcular el vector de dirección hacia la cámara
+		//	glm::vec3 direction = pos - camera.getCameraPosition();
+		//	glm::vec3 direction_normalizada = glm::normalize(direction);
 
-			if (collected_scraps >= 2 && !spirit_loose) {
-				pos += (sandstorm_velocity * deltaTime) * direction_normalizada;
-				std::cout << "The spirits of the dessert chase you. Run or die." << std::endl;
-			}
-			// Transformación y renderizado
-			glm::mat4 ModelMatrix = glm::mat4(1.0f);
-			ModelMatrix = glm::translate(ModelMatrix, pos);
-			ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.3f, 0.3f, 0.3f));
-			glm::mat4 MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
+		//	if (collected_scraps >= 2 && !spirit_loose) {
+		//		pos += (sandstorm_velocity * deltaTime) * direction_normalizada;
+		//		std::cout << "The spirits of the dessert chase you. Run or die." << std::endl;
+		//	}
+		//	// Transformación y renderizado
+		//	glm::mat4 ModelMatrix = glm::mat4(1.0f);
+		//	ModelMatrix = glm::translate(ModelMatrix, pos);
+		//	ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.3f, 0.3f, 0.3f));
+		//	glm::mat4 MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
 
-			GLuint MatrixID = glGetUniformLocation(shader.getId(), "MVP");
-			glUniformMatrix4fv(MatrixID, 1, GL_FALSE, glm::value_ptr(MVP));
+		//	GLuint MatrixID = glGetUniformLocation(shader.getId(), "MVP");
+		//	glUniformMatrix4fv(MatrixID, 1, GL_FALSE, glm::value_ptr(MVP));
 
-			sandstorm.draw(shader);
+		//	sandstorm.draw(shader);
 
-			// Comprobar si la tormenta atrapa al jugador
-			if (glm::length(camera.getCameraPosition() - pos) < 5.0f && !gameOver) {
-				std::cout << "The spirits catched you. GAME OVER" << std::endl;
-				gameOver = true;
-				glfwSetWindowShouldClose(window.getWindow(), GL_TRUE);
-			}
-			i++;
-		}
-
-
-		/////////////////////////////////////////
-		// CACTUS
-
-		for (const auto& pos : cactus_positions) {
-			glm::mat4 ModelMatrix = glm::mat4(1.0f);
-			ModelMatrix = glm::translate(ModelMatrix, pos);
+		//	// Comprobar si la tormenta atrapa al jugador
+		//	if (glm::length(camera.getCameraPosition() - pos) < 5.0f && !gameOver) {
+		//		std::cout << "The spirits catched you. GAME OVER" << std::endl;
+		//		gameOver = true;
+		//		glfwSetWindowShouldClose(window.getWindow(), GL_TRUE);
+		//	}
+		//	i++;
+		//}
 
 
-			ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.8f, 0.8f, 0.8f));
+		///////////////////////////////////////////
+		//// CACTUS
 
-			glm::mat4 MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
-
-			GLuint MatrixID = glGetUniformLocation(shader.getId(), "MVP");
-			glUniformMatrix4fv(MatrixID, 1, GL_FALSE, glm::value_ptr(MVP));
-
-			cactus.draw(shader);
-
-			if (cactusImmunityTimer == 0 && glm::length(camera.getCameraPosition() - pos) < 17.0f) {
-
-				timer -= 10.0f;
-				cactusImmunityTimer = 1000; // esto es porque como chequea la colision en todos frames
-				// si tocabas cactus te morias del tiron. esto te da unos segundos de 
-				// inmunidad mientras de sales del cactus
-
-				//std::cout << "You got hurt by the cactus! You now have " << (int)timer << " seconds left before you weaken." << std::endl;
-				ImGui::Text("You got hurt by the cactus!You now have (int)timerseconds left before you weaken.");
-
-			}
-			else if(cactusImmunityTimer > 0){
-				cactusImmunityTimer --;
-			}
-		}
+		//for (const auto& pos : cactus_positions) {
+		//	glm::mat4 ModelMatrix = glm::mat4(1.0f);
+		//	ModelMatrix = glm::translate(ModelMatrix, pos);
 
 
-		//////////////////////////////////////////
+		//	ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.8f, 0.8f, 0.8f));
+
+		//	glm::mat4 MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
+
+		//	GLuint MatrixID = glGetUniformLocation(shader.getId(), "MVP");
+		//	glUniformMatrix4fv(MatrixID, 1, GL_FALSE, glm::value_ptr(MVP));
+
+		//	cactus.draw(shader);
+
+		//	if (cactusImmunityTimer == 0 && glm::length(camera.getCameraPosition() - pos) < 17.0f) {
+
+		//		timer -= 10.0f;
+		//		cactusImmunityTimer = 1000; // esto es porque como chequea la colision en todos frames
+		//		// si tocabas cactus te morias del tiron. esto te da unos segundos de 
+		//		// inmunidad mientras de sales del cactus
+
+		//		//std::cout << "You got hurt by the cactus! You now have " << (int)timer << " seconds left before you weaken." << std::endl;
+		//		ImGui::Text("You got hurt by the cactus!You now have (int)timerseconds left before you weaken.");
+
+		//	}
+		//	else if(cactusImmunityTimer > 0){
+		//		cactusImmunityTimer --;
+		//	}
+		//}
+
+		//
+		////////////////////////////////////////////
 
 
-		///// Test Obj files for box ////
+		/////// Test Obj files for box ////
 
-		GLuint MatrixID2 = glGetUniformLocation(shader.getId(), "MVP");
-		GLuint ModelMatrixID = glGetUniformLocation(shader.getId(), "model");
+		//GLuint MatrixID2 = glGetUniformLocation(shader.getId(), "MVP");
+		//GLuint ModelMatrixID = glGetUniformLocation(shader.getId(), "model");
 
-		ModelMatrix = glm::mat4(1.0);
-		ModelMatrix = glm::translate(ModelMatrix, glm::vec3(0.0f, -4.0f, 0.0f));
-		ModelMatrix = glm::scale(ModelMatrix, glm::vec3(350.0f, 350.0f, 350.0f));
-		MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
-		glUniformMatrix4fv(MatrixID2, 1, GL_FALSE, &MVP[0][0]);
-		glUniformMatrix4fv(ModelMatrixID, 1, GL_FALSE, &ModelMatrix[0][0]);
-		glUniform3f(glGetUniformLocation(shader.getId(), "lightColor"), lightColor.x, lightColor.y, lightColor.z);
-		glUniform3f(glGetUniformLocation(shader.getId(), "lightPos"), lightPos.x, lightPos.y, lightPos.z);
-		glUniform3f(glGetUniformLocation(shader.getId(), "viewPos"), camera.getCameraPosition().x, camera.getCameraPosition().y, camera.getCameraPosition().z);
+		//ModelMatrix = glm::mat4(1.0);
+		//ModelMatrix = glm::translate(ModelMatrix, glm::vec3(0.0f, -4.0f, 0.0f));
+		//ModelMatrix = glm::scale(ModelMatrix, glm::vec3(350.0f, 350.0f, 350.0f));
+		//MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
+		//glUniformMatrix4fv(MatrixID2, 1, GL_FALSE, &MVP[0][0]);
+		//glUniformMatrix4fv(ModelMatrixID, 1, GL_FALSE, &ModelMatrix[0][0]);
+		//glUniform3f(glGetUniformLocation(shader.getId(), "lightColor"), lightColor.x, lightColor.y, lightColor.z);
+		//glUniform3f(glGetUniformLocation(shader.getId(), "lightPos"), lightPos.x, lightPos.y, lightPos.z);
+		//glUniform3f(glGetUniformLocation(shader.getId(), "viewPos"), camera.getCameraPosition().x, camera.getCameraPosition().y, camera.getCameraPosition().z);
 
-		box.draw(shader);
+		//box.draw(shader);
 
-		///// Test plane Obj file //////
+		/////// Test plane Obj file //////
 
-		GLuint MatrixID3 = glGetUniformLocation(terrainShader.getId(), "MVP");
-		GLuint ModelMatrixID1 = glGetUniformLocation(terrainShader.getId(), "model");
+		//GLuint MatrixID3 = glGetUniformLocation(terrainShader.getId(), "MVP");
+		//GLuint ModelMatrixID1 = glGetUniformLocation(terrainShader.getId(), "model");
 
-		ModelMatrix = glm::mat4(1.0);
-		ModelMatrix = glm::translate(ModelMatrix, glm::vec3(0.0f, -15.0f, 0.0f));
-		ModelMatrix = glm::scale(ModelMatrix, glm::vec3(20.0f, 20.0f, 20.0f));
-		MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
-		glUniformMatrix4fv(MatrixID3, 1, GL_FALSE, &MVP[0][0]);
-		glUniformMatrix4fv(ModelMatrixID1, 1, GL_FALSE, &ModelMatrix[0][0]);
-		glUniform3f(glGetUniformLocation(terrainShader.getId(), "lightColor"), lightColor.x, lightColor.y, lightColor.z);
-		glUniform3f(glGetUniformLocation(terrainShader.getId(), "lightPos"), lightPos.x, lightPos.y, lightPos.z);
-		glUniform3f(glGetUniformLocation(terrainShader.getId(), "viewPos"), camera.getCameraPosition().x, camera.getCameraPosition().y, camera.getCameraPosition().z);
+		//ModelMatrix = glm::mat4(1.0);
+		//ModelMatrix = glm::translate(ModelMatrix, glm::vec3(0.0f, -15.0f, 0.0f));
+		//ModelMatrix = glm::scale(ModelMatrix, glm::vec3(20.0f, 20.0f, 20.0f));
+		//MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
+		//glUniformMatrix4fv(MatrixID3, 1, GL_FALSE, &MVP[0][0]);
+		//glUniformMatrix4fv(ModelMatrixID1, 1, GL_FALSE, &ModelMatrix[0][0]);
+		//glUniform3f(glGetUniformLocation(terrainShader.getId(), "lightColor"), lightColor.x, lightColor.y, lightColor.z);
+		//glUniform3f(glGetUniformLocation(terrainShader.getId(), "lightPos"), lightPos.x, lightPos.y, lightPos.z);
+		//glUniform3f(glGetUniformLocation(terrainShader.getId(), "viewPos"), camera.getCameraPosition().x, camera.getCameraPosition().y, camera.getCameraPosition().z);
 
-		plane.draw(terrainShader);
+		//plane.draw(terrainShader);
 
-		// Water
+		//// Water
 
-		waterShader.use();
-		GLuint MatrixID4 = glGetUniformLocation(waterShader.getId(), "MVP");
-		GLuint ModelMatrixID2 = glGetUniformLocation(waterShader.getId(), "model");
+		//waterShader.use();
+		//GLuint MatrixID4 = glGetUniformLocation(waterShader.getId(), "MVP");
+		//GLuint ModelMatrixID2 = glGetUniformLocation(waterShader.getId(), "model");
 
-		float time = glfwGetTime();
+		//float time = glfwGetTime();
 
-		ModelMatrix = glm::mat4(1.0);
-		ModelMatrix = glm::translate(ModelMatrix, glm::vec3(-200.0f, -14.0f, 50.0f));
-		ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.2f, 0.2f, 0.2f));
-		MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
-		glUniformMatrix4fv(MatrixID3, 1, GL_FALSE, &MVP[0][0]);
-		glUniformMatrix4fv(ModelMatrixID1, 1, GL_FALSE, &ModelMatrix[0][0]);
-		glUniform3f(glGetUniformLocation(waterShader.getId(), "lightColor"), lightColor.x, lightColor.y, lightColor.z);
-		glUniform3f(glGetUniformLocation(waterShader.getId(), "lightPos"), lightPos.x, lightPos.y, lightPos.z);
-		glUniform3f(glGetUniformLocation(waterShader.getId(), "viewPos"), camera.getCameraPosition().x, camera.getCameraPosition().y, camera.getCameraPosition().z);
+		//ModelMatrix = glm::mat4(1.0);
+		//ModelMatrix = glm::translate(ModelMatrix, glm::vec3(-200.0f, -14.0f, 50.0f));
+		//ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.2f, 0.2f, 0.2f));
+		//MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
+		//glUniformMatrix4fv(MatrixID3, 1, GL_FALSE, &MVP[0][0]);
+		//glUniformMatrix4fv(ModelMatrixID1, 1, GL_FALSE, &ModelMatrix[0][0]);
+		//glUniform3f(glGetUniformLocation(waterShader.getId(), "lightColor"), lightColor.x, lightColor.y, lightColor.z);
+		//glUniform3f(glGetUniformLocation(waterShader.getId(), "lightPos"), lightPos.x, lightPos.y, lightPos.z);
+		//glUniform3f(glGetUniformLocation(waterShader.getId(), "viewPos"), camera.getCameraPosition().x, camera.getCameraPosition().y, camera.getCameraPosition().z);
 
-		glUniform1f(glGetUniformLocation(waterShader.getId(), "time"), time);
+		//glUniform1f(glGetUniformLocation(waterShader.getId(), "time"), time);
 
-		water.draw(waterShader);
+		//water.draw(waterShader);
 
-		///////// WREK////////
+		/////////// WREK////////
 
-		shader.use();
+		//shader.use();
 
-		ModelMatrix = glm::mat4(1.0);
-		ModelMatrix = glm::translate(ModelMatrix, glm::vec3(0.0f, -5.0f, 0.0f));
-		ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.1f, 0.1f, 0.1f));
-		//ModelMatrix = glm::rotate(ModelMatrix, glm::radians(60.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-		MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
-		glUniformMatrix4fv(MatrixID2, 1, GL_FALSE, &MVP[0][0]);
-		glUniformMatrix4fv(ModelMatrixID, 1, GL_FALSE, &ModelMatrix[0][0]);
-		glUniform3f(glGetUniformLocation(shader.getId(), "lightColor"), lightColor.x, lightColor.y, lightColor.z);
-		glUniform3f(glGetUniformLocation(shader.getId(), "lightPos"), lightPos.x, lightPos.y, lightPos.z);
-		glUniform3f(glGetUniformLocation(shader.getId(), "viewPos"), camera.getCameraPosition().x, camera.getCameraPosition().y, camera.getCameraPosition().z);
+		//ModelMatrix = glm::mat4(1.0);
+		//ModelMatrix = glm::translate(ModelMatrix, glm::vec3(0.0f, -5.0f, 0.0f));
+		//ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.1f, 0.1f, 0.1f));
+		////ModelMatrix = glm::rotate(ModelMatrix, glm::radians(60.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+		//MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
+		//glUniformMatrix4fv(MatrixID2, 1, GL_FALSE, &MVP[0][0]);
+		//glUniformMatrix4fv(ModelMatrixID, 1, GL_FALSE, &ModelMatrix[0][0]);
+		//glUniform3f(glGetUniformLocation(shader.getId(), "lightColor"), lightColor.x, lightColor.y, lightColor.z);
+		//glUniform3f(glGetUniformLocation(shader.getId(), "lightPos"), lightPos.x, lightPos.y, lightPos.z);
+		//glUniform3f(glGetUniformLocation(shader.getId(), "viewPos"), camera.getCameraPosition().x, camera.getCameraPosition().y, camera.getCameraPosition().z);
 
-		wrek.draw(shader);
+		//wrek.draw(shader);
 
-		///////// HEART////////
+		/////////// HEART////////
 
-		ModelMatrix = glm::mat4(1.0);
-		glm::vec3 vector = glm::vec3((camera.getCameraPosition() +
-			0.8f *camera.getCameraViewDirection() +
-			1.0f * camera.getCameraRight() + -0.5f  * camera.getCameraUp()));
-		ModelMatrix = glm::translate(ModelMatrix, vector);
-		ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.00003f, 0.00003f, 0.00003f)*timer);
-		//ModelMatrix = glm::rotate(ModelMatrix, glm::radians(60.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-		MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
-		glUniformMatrix4fv(MatrixID2, 1, GL_FALSE, &MVP[0][0]);
-		glUniformMatrix4fv(ModelMatrixID, 1, GL_FALSE, &ModelMatrix[0][0]);
-		glUniform3f(glGetUniformLocation(shader.getId(), "lightColor"), lightColor.x, lightColor.y, lightColor.z);
-		glUniform3f(glGetUniformLocation(shader.getId(), "lightPos"), lightPos.x, lightPos.y, lightPos.z);
-		glUniform3f(glGetUniformLocation(shader.getId(), "viewPos"), camera.getCameraPosition().x, camera.getCameraPosition().y, camera.getCameraPosition().z);
+		//ModelMatrix = glm::mat4(1.0);
+		//glm::vec3 vector = glm::vec3((camera.getCameraPosition() +
+		//	0.8f *camera.getCameraViewDirection() +
+		//	1.0f * camera.getCameraRight() + -0.5f  * camera.getCameraUp()));
+		//ModelMatrix = glm::translate(ModelMatrix, vector);
+		//ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.00003f, 0.00003f, 0.00003f)*timer);
+		////ModelMatrix = glm::rotate(ModelMatrix, glm::radians(60.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+		//MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
+		//glUniformMatrix4fv(MatrixID2, 1, GL_FALSE, &MVP[0][0]);
+		//glUniformMatrix4fv(ModelMatrixID, 1, GL_FALSE, &ModelMatrix[0][0]);
+		//glUniform3f(glGetUniformLocation(shader.getId(), "lightColor"), lightColor.x, lightColor.y, lightColor.z);
+		//glUniform3f(glGetUniformLocation(shader.getId(), "lightPos"), lightPos.x, lightPos.y, lightPos.z);
+		//glUniform3f(glGetUniformLocation(shader.getId(), "viewPos"), camera.getCameraPosition().x, camera.getCameraPosition().y, camera.getCameraPosition().z);
 
-		heart.draw(shader);
+		//heart.draw(shader);
 
-		///////// HEART////////
+		/////////// HEART////////
 
-		ModelMatrix = glm::mat4(1.0);
-		ModelMatrix = glm::translate(ModelMatrix, glm::vec3(300.0f, -20.0f, 100.0f));
-		ModelMatrix = glm::scale(ModelMatrix, glm::vec3(15.0f, 15.0f, 15.0f));
-		//ModelMatrix = glm::rotate(ModelMatrix, glm::radians(60.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-		MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
-		glUniformMatrix4fv(MatrixID2, 1, GL_FALSE, &MVP[0][0]);
-		glUniformMatrix4fv(ModelMatrixID, 1, GL_FALSE, &ModelMatrix[0][0]);
-		glUniform3f(glGetUniformLocation(shader.getId(), "lightColor"), lightColor.x, lightColor.y, lightColor.z);
-		glUniform3f(glGetUniformLocation(shader.getId(), "lightPos"), lightPos.x, lightPos.y, lightPos.z);
-		glUniform3f(glGetUniformLocation(shader.getId(), "viewPos"), camera.getCameraPosition().x, camera.getCameraPosition().y, camera.getCameraPosition().z);
+		//ModelMatrix = glm::mat4(1.0);
+		//ModelMatrix = glm::translate(ModelMatrix, glm::vec3(300.0f, -20.0f, 100.0f));
+		//ModelMatrix = glm::scale(ModelMatrix, glm::vec3(15.0f, 15.0f, 15.0f));
+		////ModelMatrix = glm::rotate(ModelMatrix, glm::radians(60.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+		//MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
+		//glUniformMatrix4fv(MatrixID2, 1, GL_FALSE, &MVP[0][0]);
+		//glUniformMatrix4fv(ModelMatrixID, 1, GL_FALSE, &ModelMatrix[0][0]);
+		//glUniform3f(glGetUniformLocation(shader.getId(), "lightColor"), lightColor.x, lightColor.y, lightColor.z);
+		//glUniform3f(glGetUniformLocation(shader.getId(), "lightPos"), lightPos.x, lightPos.y, lightPos.z);
+		//glUniform3f(glGetUniformLocation(shader.getId(), "viewPos"), camera.getCameraPosition().x, camera.getCameraPosition().y, camera.getCameraPosition().z);
 
-		well.draw(shader);
+		//well.draw(shader);
 
-		if (showHistory) {
-			if (phase == 0) {
-				ImGui::Text(phase0);
-			}else if(phase == 1) {
-				ImGui::Text(phase1);
-			}
-			else if(phase == 2) {
-				ImGui::Text(phase2);
-			}
-			else if(phase == 3){
-				ImGui::Text(phase3);
-			}
-			else {
-				ImGui::Text(phase4);
-			}
+		///*if (showHistory) {
+		//	if (phase == 0) {
+		//		ImGui::Text(phase0);
+		//	}else if(phase == 1) {
+		//		ImGui::Text(phase1);
+		//	}
+		//	else if(phase == 2) {
+		//		ImGui::Text(phase2);
+		//	}
+		//	else if(phase == 3){
+		//		ImGui::Text(phase3);
+		//	}
+		//	else {
+		//		ImGui::Text(phase4);
+		//	}
+		//}*/
 
-			
-			
-		}
+
+		
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0, 0, window.getWidth(), window.getHeight());
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
 		ImGui::End();
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-		
-
 		window.update();
 	}
+	
+	/*ImGui::DestroyContext();*/
+	}
 
-	ImGui::DestroyContext();
-
-}
 
 void processKeyboardInput()
 {
